@@ -23,7 +23,7 @@ class Cache:
         self._redis.set(data_key, data)
         return data_key
 
-      def get(
+    def get(
             self,
             key: str,
             fn: Callable = None,
