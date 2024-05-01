@@ -1,22 +1,39 @@
 #!/usr/bin/env python3
 """ Implementing an expiring web cache and tracker
     obtain the HTML content of a particular URL and returns it """
-import redis
 import requests
-r = redis.Redis()
-count = 0
+import time
+from functools import wraps
 
+def cache_with_expiry(expiry_time):
+    def decorator(func):
+        cache = {}
 
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            url = args[0]
+            if url in cache and time.time() - cache[url]['timestamp'] < expiry_time:
+                return cache[url]['content']
+
+            result = func(*args, **kwargs)
+            cache[url] = {'content': result, 'timestamp': time.time()}
+            return result
+
+        return wrapper
+
+    return decorator
+
+@cache_with_expiry(10)
 def get_page(url: str) -> str:
-    """ track how many times a particular URL was accessed in the key
-        "count:{url}"
-        and cache the result with an expiration time of 10 seconds """
-    r.set(f"cached:{url}", count)
-    resp = requests.get(url)
-    r.incr(f"count:{url}")
-    r.setex(f"cached:{url}", 10, r.get(f"cached:{url}"))
-    return resp.text
+    response = requests.get(url)
+    return response.text
 
-
-if __name__ == "__main__":
-    get_page('http://slowwly.robertomurray.co.uk')
+# Test the function
+url = 'http://slowwly.robertomurray.co.uk/delay/1000/url/http://www.google.com'
+print(get_page(url))
+# This call should be cached
+print(get_page(url))
+# Wait for cache expiry (more than 10 seconds)
+time.sleep(11)
+# Cache expired, should fetch again
+print(get_page(url))
